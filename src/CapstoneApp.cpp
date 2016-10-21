@@ -1,6 +1,7 @@
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
+#include "cinder/params/Params.h"
 
 #include "Kinect2.h"
 
@@ -15,20 +16,47 @@ public:
 	void update() override;
 	void draw() override;
 private:
+	void setupKinect();
+	void setupParameters();
+	// kinect variables
 	ci::Channel16uRef  mChannelDepth;
+	ci::Surface8uRef   mSurfaceColor;
 	ci::Channel8uRef   mChannelBodyIndex;
 	Kinect2::BodyFrame mBodyFrame;
 	Kinect2::DeviceRef mDevice;
+	// screen parameters
+	float						mFrameRate;
+	bool						mFullScreen;
+	ci::params::InterfaceGlRef	mParams;
 };
+
+// ---------------
+// Setup Functions
+// ---------------
 
 void CapstoneApp::setup()
 {
+	setupKinect();
+	setupParameters();
+}
+
+void CapstoneApp::setupKinect()
+{
+	// connect + start the kinect.
 	mDevice = Kinect2::Device::create();
 	mDevice->start();
+
+	mDevice->enableHandTracking(true);
+
 	// connect to the depth channel.
 	mDevice->connectDepthEventHandler([&](const Kinect2::DepthFrame frame)
 	{
 		mChannelDepth = frame.getChannel();
+	});
+	// connect to the hd video channel.
+	mDevice->connectColorEventHandler([&](const Kinect2::ColorFrame& frame)
+	{
+		mSurfaceColor = frame.getSurface();
 	});
 	// connect to the body channel.
 	mDevice->connectBodyEventHandler([&](const Kinect2::BodyFrame frame)
@@ -40,16 +68,45 @@ void CapstoneApp::setup()
 	{
 		mChannelBodyIndex = frame.getChannel();
 	});
-	mDevice->enableHandTracking(true);
 }
+
+void CapstoneApp::setupParameters() 
+{
+	// set parameters to default values.
+	mFrameRate = 0.0f;
+	mFullScreen = false;
+	// create interface for parameters.
+	mParams = params::InterfaceGl::create("Params", ivec2(200, 100));
+	mParams->addParam("Frame rate", &mFrameRate, "", true);
+	mParams->addParam("Full screen", &mFullScreen).key("f");
+	mParams->addButton("Quit", [&]() { quit(); }, "key=q");
+}
+
+// --------------
+// Event Handlers
+// --------------
 
 void CapstoneApp::mouseDown(MouseEvent event)
 {
 }
 
+// ----------------
+// Update Functions
+// ----------------
+
 void CapstoneApp::update()
 {
+	mFrameRate = getAverageFps();
+
+	if (mFullScreen != isFullScreen()) {
+		setFullScreen(mFullScreen);
+		mFullScreen = isFullScreen();
+	}
 }
+
+// --------------
+// Draw Functions
+// --------------
 
 void CapstoneApp::draw()
 {
@@ -68,10 +125,10 @@ void CapstoneApp::draw()
 	gl::disableDepthRead();
 	gl::disableDepthWrite();
 
-	// draw the depth channel.
-	if (mChannelDepth) {
+	// draw the hd color channel.
+	if (mSurfaceColor) {
 		gl::enable(GL_TEXTURE_2D);
-		const gl::TextureRef tex = gl::Texture::create(*Kinect2::channel16To8(mChannelDepth));
+		const gl::TextureRef tex = gl::Texture::create(*mSurfaceColor);
 		gl::draw(tex, tex->getBounds(), Rectf(getWindowBounds()));
 	}
 	// draw the body channel overtop of the depth.
@@ -101,8 +158,11 @@ void CapstoneApp::draw()
 			}
 		}
 	}
+
+	// draw the parameters interface.
+	mParams->draw();
 }
 
 CINDER_APP(CapstoneApp, RendererGl, [&](App::Settings *settings) {
-	settings->setWindowSize(1280, 720);
+	settings->prepareWindow(Window::Format().size(1280, 720).title("Basic App"));
 })
