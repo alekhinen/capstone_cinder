@@ -16,8 +16,11 @@ public:
 	void update() override;
 	void draw() override;
 private:
+	// helper functions
 	void setupKinect();
 	void setupParameters();
+	void drawBackground();
+	void drawBodies();
 	// kinect variables
 	ci::Channel16uRef  mChannelDepth;
 	ci::Surface8uRef   mSurfaceColor;
@@ -28,6 +31,10 @@ private:
 	float						mFrameRate;
 	bool						mFullScreen;
 	ci::params::InterfaceGlRef	mParams;
+	// sequencer note variables
+	int noteSize      = 45;
+	vec2 noteTopLeft  = vec2(300, 175);
+	ColorAf noteColor = ColorAf(1.0f, 1.0f, 1.0f, 0.85f);
 };
 
 // ---------------
@@ -116,7 +123,6 @@ void CapstoneApp::draw()
 	const gl::ScopedBlendAlpha scopedBlendAlpha;
 	gl::setMatricesWindow(getWindowSize());
 
-
 	// clear the screen.
 	gl::clear();
 	gl::color(ColorAf::white());
@@ -125,13 +131,31 @@ void CapstoneApp::draw()
 	gl::disableDepthRead();
 	gl::disableDepthWrite();
 
+	drawBackground();
+	drawBodies();
+
+	// draw the sequencer note.
+	gl::enable(GL_TEXTURE_2D);
+	gl::color(noteColor);
+	gl::drawSolidRect(Rectf(noteTopLeft, vec2(noteTopLeft.x + noteSize, noteTopLeft.y + noteSize)));
+
+	// draw the parameters interface.
+	mParams->draw();
+}
+
+void CapstoneApp::drawBackground()
+{
 	// draw the hd color channel.
 	if (mSurfaceColor) {
 		gl::enable(GL_TEXTURE_2D);
 		const gl::TextureRef tex = gl::Texture::create(*mSurfaceColor);
 		gl::draw(tex, tex->getBounds(), Rectf(getWindowBounds()));
 	}
-	// draw the body channel overtop of the depth.
+}
+
+void CapstoneApp::drawBodies()
+{
+	// draw the body channel overtop of the hd color.
 	if (mChannelBodyIndex) {
 		// drawing the bodies.
 		gl::enable(GL_TEXTURE_2D);
@@ -158,10 +182,11 @@ void CapstoneApp::draw()
 			}
 		}
 	}
-
-	// draw the parameters interface.
-	mParams->draw();
 }
+
+// --------
+// Settings
+// --------
 
 CINDER_APP(CapstoneApp, RendererGl, [&](App::Settings *settings) {
 	settings->prepareWindow(Window::Format().size(1280, 720).title("Basic App"));
