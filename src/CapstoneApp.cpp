@@ -19,6 +19,9 @@ private:
 	// helper functions
 	void setupKinect();
 	void setupParameters();
+	void updateScreenParameters();
+	void updateNotePosition();
+	bool inBounds(vec2 hand, vec2 note);
 	void drawBackground();
 	void drawBodies();
 	// kinect variables
@@ -35,6 +38,7 @@ private:
 	int noteSize      = 45;
 	vec2 noteTopLeft  = vec2(300, 175);
 	ColorAf noteColor = ColorAf(1.0f, 1.0f, 1.0f, 0.85f);
+	bool noteCaught   = false;
 };
 
 // ---------------
@@ -103,12 +107,50 @@ void CapstoneApp::mouseDown(MouseEvent event)
 
 void CapstoneApp::update()
 {
+	updateScreenParameters();
+	updateNotePosition();
+}
+
+void CapstoneApp::updateScreenParameters()
+{
 	mFrameRate = getAverageFps();
 
 	if (mFullScreen != isFullScreen()) {
 		setFullScreen(mFullScreen);
 		mFullScreen = isFullScreen();
 	}
+}
+
+void CapstoneApp::updateNotePosition()
+{
+	for (const Kinect2::Body body : mBodyFrame.getBodies()) {
+		if (body.isTracked()) {
+			const Kinect2::Body::Hand leftHand = body.getHandLeft();
+			const Kinect2::Body::Hand rightHand = body.getHandRight();
+			const ivec2 lhpos = mDevice->mapCameraToDepth(body.getJointMap().at(JointType_HandLeft).getPosition());
+			const ivec2 rhpos = mDevice->mapCameraToDepth(body.getJointMap().at(JointType_HandRight).getPosition());
+			if (leftHand.getState() == HandState_Closed && noteCaught) {
+				noteTopLeft = vec2(lhpos.x, lhpos.y);
+			}
+			else if (rightHand.getState() == HandState_Closed && noteCaught) {
+				noteTopLeft = vec2(rhpos.x, rhpos.y);
+			}
+			else if (inBounds(lhpos, noteTopLeft) || inBounds(rhpos, noteTopLeft)) {
+				OutputDebugString(L"note got caught \n");
+				noteCaught = true;
+			}
+			else {
+				noteCaught = false;
+			}
+			
+		}
+	}
+}
+
+bool CapstoneApp::inBounds(vec2 hand, vec2 note) 
+{
+	int delta = abs(hand.x - note.x) + abs(hand.y - note.y);
+	return delta < 30;
 }
 
 // --------------
