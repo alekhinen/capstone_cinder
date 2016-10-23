@@ -34,6 +34,8 @@ private:
 	float						mFrameRate;
 	bool						mFullScreen;
 	ci::params::InterfaceGlRef	mParams;
+	// hand state variables
+	vec2 leftHandCoord = vec2(0, 0);
 	// sequencer note variables
 	int noteSize      = 45;
 	vec2 noteTopLeft  = vec2(100, 175);
@@ -131,7 +133,8 @@ void CapstoneApp::updateNotePosition()
 			//const ivec2 rhpos = mDevice->mapCameraToDepth(body.getJointMap().at(JointType_HandRight).getPosition());
 			if (leftHand.getState() == HandState_Closed && noteCaught) {
 				OutputDebugString(L"note is caught \n");
-				noteTopLeft = vec2(lhpos.x, lhpos.y);
+				vec2 leftHandDelta = vec2(lhpos.x - leftHandCoord.x, lhpos.y - leftHandCoord.y);
+				noteTopLeft = vec2(noteTopLeft.x + leftHandDelta.x, noteTopLeft.y + leftHandDelta.y);
 			}
 			//else if (rightHand.getState() == HandState_Closed && noteCaught) {
 			//	OutputDebugString(L"note is caught \n");
@@ -146,21 +149,18 @@ void CapstoneApp::updateNotePosition()
 				OutputDebugString(L"note did not get caught \n");
 				noteCaught = false;
 			}
-			
+			leftHandCoord = lhpos;
 		}
 	}
 }
 
 bool CapstoneApp::inBounds(vec2 hand, vec2 note) 
 {
-	string handx = to_string(hand.x);
-	string handy = to_string(hand.y);
-	string notex = to_string(note.x);
-	string notey = to_string(note.y);
-	string msg = "hand (x, y): (" + handx + ", " + handy + ") note: (" + notex + ", " + notey + ") \n";
-	OutputDebugStringA(msg.c_str());
-	int delta = abs(hand.x - note.x) + abs(hand.y - note.y);
-	return delta < 30;
+	int noteXCenter = note.x + (noteSize / 2);
+	int noteYCenter = note.y + (noteSize / 2);
+	// assumes that hand coordinate is the center of the hand.
+	int delta = abs(hand.x - noteXCenter) + abs(hand.y - noteYCenter);
+	return delta < noteSize;
 }
 
 // --------------
