@@ -36,7 +36,7 @@ private:
 	ci::params::InterfaceGlRef	mParams;
 	// sequencer note variables
 	int noteSize      = 45;
-	vec2 noteTopLeft  = vec2(300, 175);
+	vec2 noteTopLeft  = vec2(100, 175);
 	ColorAf noteColor = ColorAf(1.0f, 1.0f, 1.0f, 0.85f);
 	bool noteCaught   = false;
 };
@@ -128,18 +128,22 @@ void CapstoneApp::updateNotePosition()
 			const Kinect2::Body::Hand leftHand = body.getHandLeft();
 			const Kinect2::Body::Hand rightHand = body.getHandRight();
 			const ivec2 lhpos = mDevice->mapCameraToDepth(body.getJointMap().at(JointType_HandLeft).getPosition());
-			const ivec2 rhpos = mDevice->mapCameraToDepth(body.getJointMap().at(JointType_HandRight).getPosition());
+			//const ivec2 rhpos = mDevice->mapCameraToDepth(body.getJointMap().at(JointType_HandRight).getPosition());
 			if (leftHand.getState() == HandState_Closed && noteCaught) {
+				OutputDebugString(L"note is caught \n");
 				noteTopLeft = vec2(lhpos.x, lhpos.y);
 			}
-			else if (rightHand.getState() == HandState_Closed && noteCaught) {
-				noteTopLeft = vec2(rhpos.x, rhpos.y);
-			}
-			else if (inBounds(lhpos, noteTopLeft) || inBounds(rhpos, noteTopLeft)) {
+			//else if (rightHand.getState() == HandState_Closed && noteCaught) {
+			//	OutputDebugString(L"note is caught \n");
+			//	noteTopLeft = vec2(rhpos.x, rhpos.y);
+			//}
+			else if (inBounds(lhpos, noteTopLeft)) {
+				// || inBounds(rhpos, noteTopLeft)
 				OutputDebugString(L"note got caught \n");
 				noteCaught = true;
 			}
 			else {
+				OutputDebugString(L"note did not get caught \n");
 				noteCaught = false;
 			}
 			
@@ -149,6 +153,12 @@ void CapstoneApp::updateNotePosition()
 
 bool CapstoneApp::inBounds(vec2 hand, vec2 note) 
 {
+	string handx = to_string(hand.x);
+	string handy = to_string(hand.y);
+	string notex = to_string(note.x);
+	string notey = to_string(note.y);
+	string msg = "hand (x, y): (" + handx + ", " + handy + ") note: (" + notex + ", " + notey + ") \n";
+	OutputDebugStringA(msg.c_str());
 	int delta = abs(hand.x - note.x) + abs(hand.y - note.y);
 	return delta < 30;
 }
@@ -177,9 +187,7 @@ void CapstoneApp::draw()
 	drawBodies();
 
 	// draw the sequencer note.
-	gl::enable(GL_TEXTURE_2D);
-	gl::color(noteColor);
-	gl::drawSolidRect(Rectf(noteTopLeft, vec2(noteTopLeft.x + noteSize, noteTopLeft.y + noteSize)));
+	// see: drawBodies() for the drawing of the note.
 
 	// draw the parameters interface.
 	mParams->draw();
@@ -188,11 +196,17 @@ void CapstoneApp::draw()
 void CapstoneApp::drawBackground()
 {
 	// draw the hd color channel.
-	if (mSurfaceColor) {
-		gl::enable(GL_TEXTURE_2D);
-		const gl::TextureRef tex = gl::Texture::create(*mSurfaceColor);
-		gl::draw(tex, tex->getBounds(), Rectf(getWindowBounds()));
-	}
+	//if (mSurfaceColor) {
+	//	gl::enable(GL_TEXTURE_2D);
+	//	const gl::TextureRef tex = gl::Texture::create(*mSurfaceColor);
+	//	gl::draw(tex, tex->getBounds(), Rectf(getWindowBounds()));
+	//}
+	// draw the depth channel.
+ 	if (mChannelDepth) {
+ 		gl::enable(GL_TEXTURE_2D);
+ 		const gl::TextureRef tex = gl::Texture::create(*Kinect2::channel16To8(mChannelDepth));
+ 		gl::draw(tex, tex->getBounds(), Rectf(getWindowBounds()));
+ 	}
 }
 
 void CapstoneApp::drawBodies()
@@ -223,6 +237,10 @@ void CapstoneApp::drawBodies()
 				gl::drawSolidCircle(lhpos, 30.0f, 32);
 			}
 		}
+		// TODO: the coordinates are getting readjusted due to the rescaling.
+		//       therefore drawing the rectangle has to occur in here (should readjust this somehow...)
+		gl::color(noteColor);
+		gl::drawSolidRect(Rectf(noteTopLeft, vec2(noteTopLeft.x + noteSize, noteTopLeft.y + noteSize)));
 	}
 }
 
